@@ -21,7 +21,8 @@ import {
   Clock, 
   Activity,
   Trophy,
-  Swords
+  Swords,
+  X
 } from 'lucide-react';
 import { QuickChatBar } from './QuickChatBar';
 
@@ -124,70 +125,79 @@ Play: Typothon (Cyberpunk Edition)`;
   }, [onPlayAgain]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.92, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-4xl glass-panel rounded-3xl p-6 sm:p-8 border border-theme-primary/30 shadow-[0_0_50px_rgba(0,245,255,0.15)] my-8"
-      >
-        {/* Header with Rank & Trophy */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
-          <div className="flex items-center gap-3.5">
-            <div
-              className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-xl border ${
-                userRank === 1
-                  ? 'bg-amber-400/20 border-amber-400 text-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.3)]'
-                  : userRank === 2
-                  ? 'bg-slate-300/20 border-slate-300 text-slate-200'
-                  : userRank === 3
-                  ? 'bg-amber-700/20 border-amber-700 text-amber-600'
-                  : 'bg-white/10 border-white/20 text-slate-400'
-              }`}
-            >
-              {userRank === 1 ? '🥇' : userRank === 2 ? '🥈' : userRank === 3 ? '🥉' : '🏎️'}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-mono text-theme-primary uppercase tracking-widest font-semibold">
-                  Race Complete
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/10 text-white font-bold">
-                  PODIUM #{userRank}
-                </span>
+    <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-black/85 backdrop-blur-md p-3 sm:p-6 md:p-8">
+      <div className="min-h-full w-full flex items-start sm:items-center justify-center py-4 sm:py-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 15 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          className="w-full max-w-4xl glass-panel rounded-3xl p-5 sm:p-8 border border-theme-primary/30 shadow-[0_0_50px_rgba(0,245,255,0.15)] my-auto relative"
+        >
+          {/* Header with Rank & Trophy */}
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5">
+            <div className="flex items-center gap-3.5">
+              <div
+                className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-xl border flex-shrink-0 ${
+                  userRank === 1
+                    ? 'bg-amber-400/20 border-amber-400 text-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.3)]'
+                    : userRank === 2
+                    ? 'bg-slate-300/20 border-slate-300 text-slate-200'
+                    : userRank === 3
+                    ? 'bg-amber-700/20 border-amber-700 text-amber-600'
+                    : 'bg-white/10 border-white/20 text-slate-400'
+                }`}
+              >
+                {userRank === 1 ? '🥇' : userRank === 2 ? '🥈' : userRank === 3 ? '🥉' : '🏎️'}
               </div>
-              <h2 className="text-2xl sm:text-3xl font-black font-display tracking-tight text-white mt-0.5">
-                {userRank === 1
-                  ? 'VICTORY: GRID CHAMPION'
-                  : userRank === 2
-                  ? 'RUNNER UP: IMPRESSIVE VELOCITY'
-                  : userRank === 3
-                  ? 'PODIUM FINISH: WELL RACED'
-                  : 'RACE CONCLUDED'}
-              </h2>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono text-theme-primary uppercase tracking-widest font-semibold">
+                    Race Complete
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/10 text-white font-bold">
+                    PODIUM #{userRank}
+                  </span>
+                </div>
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-black font-display tracking-tight text-white mt-0.5 leading-tight">
+                  {userRank === 1
+                    ? 'VICTORY: GRID CHAMPION'
+                    : userRank === 2
+                    ? 'RUNNER UP: IMPRESSIVE VELOCITY'
+                    : userRank === 3
+                    ? 'PODIUM FINISH: WELL RACED'
+                    : 'RACE CONCLUDED'}
+                </h2>
+              </div>
+            </div>
+
+            {/* Quick Action Buttons + Close X */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleShare}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-panel border border-white/10 hover:border-theme-primary/40 text-xs font-mono text-slate-300 hover:text-white transition-all"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-cyber-lime" />
+                    <span className="text-cyber-lime">Copied Telemetry!</span>
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>Share Result</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={onPlayAgain}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors ml-1"
+                title="Close (Esc)"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
-
-          {/* Quick Action Buttons */}
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={handleShare}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl glass-panel border border-white/10 hover:border-theme-primary/40 text-xs font-mono text-slate-300 hover:text-white transition-all"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-cyber-lime" />
-                  <span className="text-cyber-lime">Copied Telemetry!</span>
-                </>
-              ) : (
-                <>
-                  <Share2 className="w-3.5 h-3.5" />
-                  <span>Share Result</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
 
         {/* Series Scoreboard / Rematch Banner in Multiplayer */}
         {isMultiplayer && (
@@ -310,7 +320,7 @@ Play: Typothon (Cyberpunk Edition)`;
             </div>
           </div>
 
-          <div className="h-48 sm:h-56 w-full">
+          <div className="h-44 sm:h-52 w-full">
             {results.timeline.length > 1 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={results.timeline} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -468,7 +478,8 @@ Play: Typothon (Cyberpunk Edition)`;
             )}
           </div>
         </div>
-      </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
 };

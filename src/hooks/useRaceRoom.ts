@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Racer, MultiTabMessage, RaceMode, ToastNotification } from '../types/race';
+import type { Racer, MultiTabMessage, RaceMode, DifficultyLevel, ToastNotification } from '../types/race';
 import mqtt, { type MqttClient } from 'mqtt';
 
 export interface RoomParticipant {
@@ -30,9 +30,10 @@ export function useRaceRoom(
   userWpm: number,
   isUserFinished: boolean,
   currentMode: RaceMode,
-  onRemoteStart?: (payload?: { text: string; source?: string; mode: RaceMode }) => void,
+  currentDifficulty: DifficultyLevel,
+  onRemoteStart?: (payload?: { text: string; source?: string; mode: RaceMode; difficulty?: DifficultyLevel }) => void,
   onLobbyTick?: (sec: number) => void,
-  onHostSettingsSync?: (settings: { includeBots: boolean; mode?: RaceMode }) => void
+  onHostSettingsSync?: (settings: { includeBots?: boolean; mode?: RaceMode; difficulty?: DifficultyLevel }) => void
 ) {
   const [roomId, setRoomId] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
@@ -245,13 +246,17 @@ export function useRaceRoom(
         }
         break;
 
-      case 'HOST_SETTINGS':
+      case 'HOST_SETTINGS': {
         if (msg.payload?.includeBots !== undefined) {
           setIncludeBots(msg.payload.includeBots);
         }
         onHostSettingsSync?.(msg.payload);
-        addToast(`Host updated match settings: Bots ${msg.payload?.includeBots ? 'ON' : 'OFF'}`, 'info');
+        const modeLabel = msg.payload?.mode?.type ? msg.payload.mode.type.toUpperCase() : '';
+        const diffLabel = msg.payload?.difficulty ? ` [${msg.payload.difficulty.toUpperCase()}]` : '';
+        const botsLabel = msg.payload?.includeBots !== undefined ? ` • Bots ${msg.payload.includeBots ? 'ON' : 'OFF'}` : '';
+        addToast(`Host updated: ${modeLabel}${diffLabel}${botsLabel}`, 'info');
         break;
+      }
 
       case 'QUICK_CHAT':
         if (msg.payload?.message) {
@@ -610,12 +615,27 @@ export function useRaceRoom(
     });
   }, [broadcastMessage, cancelLobbyCountdown]);
 
+  // Host match settings updater (bots, mode, difficulty)
+  const updateHostSettings = useCallback((newSettings: { includeBots?: boolean; mode?: RaceMode; difficulty?: DifficultyLevel }) => {
+    const nextIncludeBots = newSettings.includeBots !== undefined ? newSettings.includeBots : includeBots;
+    const nextMode = newSettings.mode || currentMode;
+    const nextDifficulty = newSettings.difficulty || currentDifficulty;
+
+    if (newSettings.includeBots !== undefined) {
+      setIncludeBots(nextIncludeBots);
+    }
+    broadcastMessage('HOST_SETTINGS', {
+      includeBots: nextIncludeBots,
+      mode: nextMode,
+      difficulty: nextDifficulty,
+    });
+    addToast(`Match rules: ${nextMode.type.toUpperCase()} [${nextDifficulty.toUpperCase()}]`, 'info');
+  }, [includeBots, currentMode, currentDifficulty, broadcastMessage, addToast]);
+
   // Host toggle bots
   const toggleIncludeBots = useCallback((enabled: boolean) => {
-    setIncludeBots(enabled);
-    broadcastMessage('HOST_SETTINGS', { includeBots: enabled, mode: currentMode });
-    addToast(`Bots ${enabled ? 'enabled' : 'disabled'} for room`, 'info');
-  }, [broadcastMessage, currentMode, addToast]);
+    updateHostSettings({ includeBots: enabled });
+  }, [updateHostSettings]);
 
   // Send tactical quick-chat
   const sendQuickChat = useCallback((message: string) => {
@@ -627,7 +647,7 @@ export function useRaceRoom(
   }, [userId, broadcastMessage]);
 
   // Start 10-second lobby countdown
-  const startLobbyCountdown = useCallback((racePayload: { text: string; source?: string; mode: RaceMode }) => {
+  const startLobbyCountdown = useCallback((racePayload: { text: string; source?: string; mode: RaceMode; difficulty?: DifficultyLevel }) => {
     const targetStartTime = Date.now() + 10000;
     lobbyTargetTimeRef.current = targetStartTime;
     lobbyPayloadRef.current = racePayload;
@@ -641,7 +661,7 @@ export function useRaceRoom(
   }, [broadcastMessage, onLobbyTick]);
 
   // Skip 10s wait and launch race now
-  const forceLaunchNow = useCallback((racePayload?: { text: string; source?: string; mode: RaceMode }) => {
+  const forceLaunchNow = useCallback((racePayload?: { text: string; source?: string; mode: RaceMode; difficulty?: DifficultyLevel }) => {
     lobbyTargetTimeRef.current = null;
     lobbyPayloadRef.current = null;
     setLobbyCountdown(null);
@@ -733,5 +753,6 @@ export function useRaceRoom(
     recordWinner,
     requestRematch,
     getInviteLink,
+    updateHostSettings,
   };
 }

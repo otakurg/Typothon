@@ -1,5 +1,5 @@
 import React from 'react';
-import type { RaceMode, RaceStatus, ThemeId } from '../types/race';
+import type { RaceMode, RaceStatus, ThemeId, DifficultyLevel } from '../types/race';
 import type { SoundProfile } from '../hooks/useSoundEffects';
 import { 
   Zap, 
@@ -12,7 +12,9 @@ import {
   Type, 
   Quote,
   Trophy,
-  Crown
+  Crown,
+  BookOpen,
+  Sliders
 } from 'lucide-react';
 
 interface RaceHeaderProps {
@@ -34,6 +36,8 @@ interface RaceHeaderProps {
   onRestart: () => void;
   isHost?: boolean;
   seriesScores?: Record<string, number>;
+  difficulty?: DifficultyLevel;
+  onSelectDifficulty?: (diff: DifficultyLevel) => void;
 }
 
 export const RaceHeader: React.FC<RaceHeaderProps> = ({
@@ -55,6 +59,8 @@ export const RaceHeader: React.FC<RaceHeaderProps> = ({
   onRestart,
   isHost = true,
   seriesScores = {},
+  difficulty = 'medium',
+  onSelectDifficulty,
 }) => {
   const isMultiplayer = !!roomId;
   const canChangeMode = !isMultiplayer || isHost;
@@ -139,13 +145,28 @@ export const RaceHeader: React.FC<RaceHeaderProps> = ({
 
       {/* Second Row: Mode Selector Tabs + Live HUD counters */}
       <div className="flex flex-wrap items-center justify-between gap-3 glass-panel p-2.5 sm:p-3 rounded-2xl border border-white/[0.08]">
-        {/* Mode Selector Tabs */}
+        {/* Mode Selector Tabs & Difficulty */}
         <div className="flex items-center gap-1 sm:gap-2 flex-wrap text-xs font-mono">
           {!canChangeMode && (
             <span className="text-[10px] text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-lg border border-amber-400/20 mr-1 flex items-center gap-1 font-semibold">
               <Crown className="w-3 h-3" /> Host Chooses Mode
             </span>
           )}
+
+          {/* Passage Mode (Full narrative paragraphs & coherent sentences) */}
+          <button
+            disabled={!canChangeMode}
+            onClick={() => onSelectMode({ type: 'passage' })}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all ${
+              mode.type === 'passage'
+                ? 'bg-theme-primary text-black border-theme-primary font-bold shadow-[0_0_10px_var(--theme-primary)]'
+                : canChangeMode ? 'bg-black/40 border-white/5 text-slate-400 hover:text-white' : 'bg-black/40 border-white/5 text-slate-600 cursor-not-allowed'
+            }`}
+            title="Full narrative paragraphs and real sentences"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>Passage</span>
+          </button>
 
           {/* Time Modes */}
           <div className="flex items-center bg-black/40 p-1 rounded-xl border border-white/5">
@@ -208,6 +229,36 @@ export const RaceHeader: React.FC<RaceHeaderProps> = ({
             <Quote className="w-3 h-3" />
             <span>Quote</span>
           </button>
+
+          {/* Difficulty Level Selector */}
+          <div className="flex items-center bg-black/40 p-1 rounded-xl border border-white/5 ml-0 sm:ml-1">
+            <span className="text-slate-500 px-1.5 flex items-center gap-1 text-[11px]">
+              <Sliders className="w-3 h-3 text-theme-primary" /> Diff:
+            </span>
+            {(['easy', 'medium', 'hard'] as const).map((diff) => {
+              const isSelected = difficulty === diff;
+              return (
+                <button
+                  key={diff}
+                  disabled={!canChangeMode}
+                  onClick={() => onSelectDifficulty?.(diff)}
+                  className={`px-2 py-0.5 rounded-lg uppercase text-[10px] font-bold tracking-wider transition-all ${
+                    isSelected
+                      ? diff === 'easy'
+                        ? 'bg-cyber-lime text-black shadow-[0_0_10px_rgba(57,255,20,0.4)]'
+                        : diff === 'medium'
+                        ? 'bg-amber-400 text-black shadow-[0_0_10px_rgba(251,191,36,0.4)]'
+                        : 'bg-cyber-crimson text-white shadow-[0_0_10px_rgba(255,51,102,0.4)]'
+                      : canChangeMode
+                      ? 'text-slate-400 hover:text-white'
+                      : 'text-slate-600 cursor-not-allowed'
+                  }`}
+                >
+                  {diff}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Series Scoreboard Pill (If tournament rounds played) */}

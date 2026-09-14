@@ -16,9 +16,14 @@ import {
   Crown,
   Bot,
   Link,
-  BotOff
+  BotOff,
+  Sliders,
+  BookOpen,
+  Timer,
+  Type
 } from 'lucide-react';
 import type { RoomParticipant } from '../hooks/useRaceRoom';
+import type { DifficultyLevel, RaceMode } from '../types/race';
 import { QuickChatBar } from './QuickChatBar';
 
 interface RoomModalProps {
@@ -45,6 +50,10 @@ interface RoomModalProps {
   onToggleIncludeBots?: (val: boolean) => void;
   onSendQuickChat?: (msg: string) => void;
   getInviteLink?: () => string;
+  difficulty?: DifficultyLevel;
+  onSelectDifficulty?: (diff: DifficultyLevel) => void;
+  mode?: RaceMode;
+  onSelectMode?: (mode: RaceMode) => void;
 }
 
 const AVATAR_OPTIONS = ['🚀', '⚡', '🛸', '🏎️', '🏍️', '👾', '🤖', '🔥'];
@@ -73,6 +82,10 @@ export const RoomModal: React.FC<RoomModalProps> = ({
   onToggleIncludeBots,
   onSendQuickChat,
   getInviteLink,
+  difficulty = 'medium',
+  onSelectDifficulty,
+  mode,
+  onSelectMode,
 }) => {
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [copiedCode, setCopiedCode] = useState(false);
@@ -282,6 +295,98 @@ export const RoomModal: React.FC<RoomModalProps> = ({
                   {includeBots ? 'ENABLED' : 'DISABLED'}
                 </span>
               )}
+            </div>
+
+            {/* Host Match Settings: Mode & Difficulty */}
+            <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 flex flex-col gap-2.5">
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="text-white font-bold flex items-center gap-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-theme-primary" />
+                  <span>Match Configuration</span>
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  {isHost ? 'Host controls rules' : 'Set by room host'}
+                </span>
+              </div>
+
+              {/* Mode Selection */}
+              <div className="flex items-center justify-between gap-2 text-xs font-mono">
+                <span className="text-slate-400 text-[11px]">Mode:</span>
+                {isHost ? (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <button
+                      onClick={() => onSelectMode?.({ type: 'passage' })}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
+                        mode?.type === 'passage'
+                          ? 'bg-theme-primary text-black shadow-[0_0_10px_var(--theme-primary)]'
+                          : 'bg-white/5 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <BookOpen className="w-3 h-3" /> Passage
+                    </button>
+                    <button
+                      onClick={() => onSelectMode?.({ type: 'time', duration: 30 })}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
+                        mode?.type === 'time'
+                          ? 'bg-theme-primary text-black shadow-[0_0_10px_var(--theme-primary)]'
+                          : 'bg-white/5 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Timer className="w-3 h-3" /> 30s
+                    </button>
+                    <button
+                      onClick={() => onSelectMode?.({ type: 'words', count: 50 })}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${
+                        mode?.type === 'words'
+                          ? 'bg-theme-primary text-black shadow-[0_0_10px_var(--theme-primary)]'
+                          : 'bg-white/5 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Type className="w-3 h-3" /> 50 Words
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-white font-bold uppercase text-[10px] px-2 py-0.5 rounded bg-white/10">
+                    {mode?.type === 'passage' ? 'Passage (Paragraphs)' : mode?.type === 'time' ? `${mode.duration}s Time` : mode?.type === 'words' ? `${mode.count} Words` : 'Quote'}
+                  </span>
+                )}
+              </div>
+
+              {/* Difficulty Selection */}
+              <div className="flex items-center justify-between gap-2 text-xs font-mono border-t border-white/5 pt-2">
+                <span className="text-slate-400 text-[11px]">Difficulty:</span>
+                {isHost ? (
+                  <div className="flex items-center gap-1">
+                    {(['easy', 'medium', 'hard'] as const).map((diff) => (
+                      <button
+                        key={diff}
+                        onClick={() => onSelectDifficulty?.(diff)}
+                        className={`px-2 py-0.5 rounded-lg uppercase text-[10px] font-bold transition-all ${
+                          difficulty === diff
+                            ? diff === 'easy'
+                              ? 'bg-cyber-lime text-black shadow-[0_0_8px_rgba(57,255,20,0.4)]'
+                              : diff === 'medium'
+                              ? 'bg-amber-400 text-black shadow-[0_0_8px_rgba(251,191,36,0.4)]'
+                              : 'bg-cyber-crimson text-white shadow-[0_0_8px_rgba(255,51,102,0.4)]'
+                            : 'bg-white/5 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {diff}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded ${
+                    difficulty === 'easy'
+                      ? 'bg-cyber-lime/20 text-cyber-lime'
+                      : difficulty === 'medium'
+                      ? 'bg-amber-400/20 text-amber-400'
+                      : 'bg-cyber-crimson/20 text-cyber-crimson'
+                  }`}>
+                    {difficulty}
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Pilot Readiness Roster */}

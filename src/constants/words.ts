@@ -1,4 +1,18 @@
-import type { RaceMode } from '../types/race';
+import type { RaceMode, DifficultyLevel } from '../types/race';
+import { getRandomPassage } from './passages';
+
+export const EASY_WORDS = [
+  "the", "be", "to", "of", "and", "a", "in", "that", "have", "it",
+  "for", "not", "on", "with", "as", "you", "do", "at", "this", "but",
+  "his", "by", "from", "they", "we", "say", "her", "she", "or", "an",
+  "will", "my", "one", "all", "would", "there", "their", "what", "so", "up",
+  "out", "if", "about", "who", "get", "which", "go", "me", "when", "make",
+  "can", "like", "time", "no", "just", "him", "know", "take", "people", "into",
+  "year", "your", "good", "some", "could", "them", "see", "other", "than", "then",
+  "now", "look", "only", "come", "its", "over", "think", "also", "back", "after",
+  "use", "two", "how", "our", "work", "first", "well", "way", "even", "new",
+  "want", "give", "day", "most", "us", "star", "home", "sky", "road", "fast"
+];
 
 export const COMMON_WORDS = [
   "the", "be", "to", "of", "and", "a", "in", "that", "have", "it",
@@ -14,6 +28,16 @@ export const COMMON_WORDS = [
   "cyber", "data", "matrix", "network", "node", "pulse", "stream", "packet", "signal", "vector",
   "protocol", "terminal", "memory", "virtual", "quantum", "kernel", "thread", "cipher", "neural", "latency",
   "bypass", "overclock", "firewall", "binary", "switch", "digital", "router", "buffer", "cache", "stack"
+];
+
+export const HARD_WORDS = [
+  "algorithm", "asynchronous", "cryptographic", "reconciliation", "deterministic",
+  "throughput", "microservice", "infrastructure", "telemetry", "architecture",
+  "polymorphism", "distributed", "concurrency", "optimization", "orchestration",
+  "submillisecond", "vulnerability", "authentication", "serialization", "fault-tolerant",
+  "byzantine", "topological", "superposition", "entropy", "memristive", "cryptography",
+  "decompilation", "synchronization", "idempotency", "heuristics", "pipeline", "interconnect",
+  "hypervisor", "transmon", "qubit", "cryostat", "arbitrage", "nanosecond", "parameter"
 ];
 
 export const CYBER_QUOTES = [
@@ -51,18 +75,40 @@ export const CYBER_QUOTES = [
   }
 ];
 
-export function generateRaceText(mode: RaceMode): { text: string; source?: string } {
+export function generateRaceText(
+  mode: RaceMode, 
+  difficulty: DifficultyLevel = 'medium'
+): { text: string; source?: string } {
+  // 1. Passage Mode (Full narrative paragraphs with coherent sentences)
+  if (mode.type === 'passage') {
+    const passage = getRandomPassage(difficulty);
+    return {
+      text: passage.text,
+      source: `${passage.title} — ${passage.author} [${difficulty.toUpperCase()}]`
+    };
+  }
+
+  // 2. Quote Mode
   if (mode.type === 'quote') {
     const item = CYBER_QUOTES[Math.floor(Math.random() * CYBER_QUOTES.length)];
     return { text: item.quote, source: item.source };
   }
 
-  const wordCount = mode.type === 'words' ? mode.count : (mode.duration === 15 ? 40 : mode.duration === 30 ? 75 : 130);
+  // 3. Time & Word Count Modes (Difficulty-scaled word bank)
+  const pool = difficulty === 'easy' 
+    ? EASY_WORDS 
+    : difficulty === 'hard' 
+    ? HARD_WORDS 
+    : COMMON_WORDS;
+
+  const wordCount = mode.type === 'words' 
+    ? mode.count 
+    : (mode.duration === 15 ? 40 : mode.duration === 30 ? 75 : 130);
   
   const selected: string[] = [];
   for (let i = 0; i < wordCount; i++) {
-    const randomIndex = Math.floor(Math.random() * COMMON_WORDS.length);
-    selected.push(COMMON_WORDS[randomIndex]);
+    const randomIndex = Math.floor(Math.random() * pool.length);
+    selected.push(pool[randomIndex]);
   }
   return { text: selected.join(' ') };
 }

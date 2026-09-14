@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import type { RaceMode, RaceStatus, ThemeId, Racer, RaceResults } from './types/race';
+import type { RaceMode, RaceStatus, ThemeId, Racer, RaceResults, DifficultyLevel } from './types/race';
 import { THEMES } from './constants/themes';
 import { generateRaceText } from './constants/words';
 import { useSoundEffects } from './hooks/useSoundEffects';
@@ -33,12 +33,20 @@ export default function App() {
     localStorage.setItem('typothon_theme', theme);
   }, [theme]);
 
-  // Race Mode & Target Text
+  // Race Mode, Difficulty & Target Text
   const [mode, setMode] = useState<RaceMode>({ type: 'time', duration: 30 });
-  const [raceData, setRaceData] = useState(() => generateRaceText(mode));
+  const [difficulty, setDifficulty] = useState<DifficultyLevel>(() => {
+    return (localStorage.getItem('typothon_difficulty') as DifficultyLevel) || 'medium';
+  });
+  const [raceData, setRaceData] = useState(() => generateRaceText(mode, difficulty));
   const [status, setStatus] = useState<RaceStatus>('idle');
   const [raceResults, setRaceResults] = useState<RaceResults | null>(null);
   const [userFinishTime, setUserFinishTime] = useState<number | undefined>(undefined);
+
+  // Persist difficulty
+  useEffect(() => {
+    localStorage.setItem('typothon_difficulty', difficulty);
+  }, [difficulty]);
 
   // Sound effects hook
   const {
@@ -67,10 +75,11 @@ export default function App() {
   });
 
   // Multiplayer Room Hook callbacks
-  const handleRemoteStart = useCallback((remotePayload?: { text: string; source?: string; mode: RaceMode }) => {
+  const handleRemoteStart = useCallback((remotePayload?: { text: string; source?: string; mode: RaceMode; difficulty?: DifficultyLevel }) => {
     if (remotePayload?.text) {
       setRaceData({ text: remotePayload.text, source: remotePayload.source });
       if (remotePayload.mode) setMode(remotePayload.mode);
+      if (remotePayload.difficulty) setDifficulty(remotePayload.difficulty);
       resetBots();
       setRaceResults(null);
       setUserFinishTime(undefined);
@@ -79,12 +88,13 @@ export default function App() {
     setStatus('countdown');
   }, [resetBots]);
 
-  const handleHostSettingsSync = useCallback((settings: { includeBots: boolean; mode?: RaceMode }) => {
-    if (settings.mode) {
-      setMode(settings.mode);
-      setRaceData(generateRaceText(settings.mode));
-    }
-  }, []);
+  const handleHostSettingsSync = useCallback((settings: { includeBots?: boolean; mode?: RaceMode; difficulty?: DifficultyLevel }) => {
+    const nextMode = settings.mode || mode;
+    const nextDiff = settings.difficulty || difficulty;
+    if (settings.mode) setMode(settings.mode);
+    if (settings.difficulty) setDifficulty(settings.difficulty);
+    setRaceData(generateRaceText(nextMode, nextDiff));
+  }, [mode, difficulty]);
 
   // Finish handler ref so useTypingEngine can be called before useRaceRoom
   const onFinishRef = useRef<(results: RaceResults) => void>(() => {});
@@ -142,11 +152,13 @@ export default function App() {
     recordWinner,
     requestRematch,
     getInviteLink,
+    updateHostSettings,
   } = useRaceRoom(
     userProgress,
     netWpm,
     status === 'finished',
     mode,
+    difficulty,
     handleRemoteStart,
     playLobbyTick,
     handleHostSettingsSync
@@ -198,25 +210,42 @@ export default function App() {
     return [...racers, ...selectedBots];
   }, [userRacer, remoteRacers, bots, includeBots]);
 
-  // Automatic 10-second F1 countdown trigger when all pilots click READY
-  useEffect(() => {
-    if (allReady && lobbyCountdown === null && status === 'idle') {
-      startLobbyCountdown({ text: raceData.text, source: raceData.source, mode });
-    }
-  }, [allReady, lobbyCountdown, status, startLobbyCountdown, raceData, mode]);
-
   // Reset / Start Race
-  const startNewRace = useCallback((newMode?: RaceMode) => {
+  const startNewRace = useCallback((newMode?: RaceMode, newDifficulty?: DifficultyLevel) => {
     const currentMode = newMode || mode;
+    const currentDiff = newDifficulty || difficulty;
     if (newMode) setMode(newMode);
+    if (newDifficulty) setDifficulty(currentDiff);
     
-    setRaceData(generateRaceText(currentMode));
+    setRaceData(generateRaceText(currentMode, currentDiff));
     resetEngine();
     resetBots();
     setRaceResults(null);
     setUserFinishTime(undefined);
     setStatus('idle');
-  }, [mode, resetEngine, resetBots]);
+  }, [mode, difficulty, resetEngine, resetBots]);
+
+  // Mode and Difficulty selection handlers (synced by host in multiplayer)
+  const handleSelectMode = useCallback((newMode: RaceMode) => {
+    startNewRace(newMode, difficulty);
+    if (roomId && isHost) {
+      updateHostSettings({ mode: newMode, difficulty });
+    }
+  }, [startNewRace, difficulty, roomId, isHost, updateHostSettings]);
+
+  const handleSelectDifficulty = useCallback((newDifficulty: DifficultyLevel) => {
+    startNewRace(mode, newDifficulty);
+    if (roomId && isHost) {
+      updateHostSettings({ mode, difficulty: newDifficulty });
+    }
+  }, [startNewRace, mode, roomId, isHost, updateHostSettings]);
+
+  // Automatic 10-second F1 countdown trigger when all pilots click READY
+  useEffect(() => {
+    if (allReady && lobbyCountdown === null && status === 'idle') {
+      startLobbyCountdown({ text: raceData.text, source: raceData.source, mode, difficulty });
+    }
+  }, [allReady, lobbyCountdown, status, startLobbyCountdown, raceData, mode, difficulty]);
 
   // Instant rematch trigger in multiplayer
   const handleRematch = useCallback(() => {
@@ -228,12 +257,12 @@ export default function App() {
   const triggerSoloStart = useCallback(() => {
     if (roomId && remoteCount > 0) {
       // In multiplayer, skip 10s and launch now
-      forceLaunchNow({ text: raceData.text, source: raceData.source, mode });
+      forceLaunchNow({ text: raceData.text, source: raceData.source, mode, difficulty });
     } else {
       // In solo mode, instant launch countdown
       setStatus('countdown');
     }
-  }, [roomId, remoteCount, forceLaunchNow, raceData, mode]);
+  }, [roomId, remoteCount, forceLaunchNow, raceData, mode, difficulty]);
 
   // When countdown completes
   const handleCountdownComplete = useCallback(() => {
@@ -267,12 +296,9 @@ export default function App() {
         {/* Header HUD & Controls */}
         <RaceHeader
           mode={mode}
-          onSelectMode={(m) => {
-            startNewRace(m);
-            if (roomId && isHost) {
-              toggleIncludeBots(includeBots);
-            }
-          }}
+          onSelectMode={handleSelectMode}
+          difficulty={difficulty}
+          onSelectDifficulty={handleSelectDifficulty}
           status={status}
           timeRemaining={timeRemaining}
           elapsedTime={elapsedTime}
@@ -298,7 +324,7 @@ export default function App() {
             userName={userName}
             userAvatar={userAvatar}
             remotePilots={remotePilots}
-            onForceLaunch={() => forceLaunchNow({ text: raceData.text, source: raceData.source, mode })}
+            onForceLaunch={() => forceLaunchNow({ text: raceData.text, source: raceData.source, mode, difficulty })}
             onAbort={toggleReady}
           />
         )}
@@ -399,6 +425,10 @@ export default function App() {
         onToggleIncludeBots={toggleIncludeBots}
         onSendQuickChat={sendQuickChat}
         getInviteLink={getInviteLink}
+        difficulty={difficulty}
+        onSelectDifficulty={handleSelectDifficulty}
+        mode={mode}
+        onSelectMode={handleSelectMode}
       />
 
       {/* Real-time Cyber Toast Alerts */}

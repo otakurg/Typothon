@@ -1,6 +1,9 @@
+export type DifficultyLevel = 'easy' | 'medium' | 'hard';
+
 export type RaceMode = 
   | { type: 'time'; duration: 15 | 30 | 60 }
   | { type: 'words'; count: 25 | 50 | 100 }
+  | { type: 'passage' }
   | { type: 'quote' };
 
 export type ThemeId = 'cyberpunk' | 'amber' | 'dracula';
