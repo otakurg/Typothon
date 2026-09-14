@@ -61,7 +61,7 @@ export const RaceHeader: React.FC<RaceHeaderProps> = ({
           </div>
           <div>
             <h1 className="text-xl font-black tracking-wider uppercase font-display bg-gradient-to-r from-theme-primary via-white to-theme-secondary bg-clip-text text-transparent">
-              TypeRacer Neo
+              Typothon
             </h1>
             <div className="flex items-center gap-2 text-[10px] font-mono text-theme-subtext">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyber-lime animate-ping" />

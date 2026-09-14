@@ -84,13 +84,13 @@ export const ResultsModal: React.FC<ResultsModalProps> = ({
 
   // Share result to clipboard
   const handleShare = async () => {
-    const text = `🏁 TypeRacer Neo Telemetry:
+    const text = `🏁 Typothon Telemetry:
 ⚡ Net Speed: ${results.netWpm} WPM (Peak: ${peakWpm} WPM)
 🎯 Accuracy: ${results.accuracy}%
 📊 Rank: #${userRank}
 ⏱️ Time: ${results.durationSeconds}s | Latency: ${results.keyLatencyMs}ms
 Consistency: ${results.consistency}%
-Play: TypeRacer Neo (Cyberpunk Edition)`;
+Play: Typothon (Cyberpunk Edition)`;
 
     try {
       await navigator.clipboard.writeText(text);

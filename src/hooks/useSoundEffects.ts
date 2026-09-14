@@ -4,13 +4,13 @@ export type SoundProfile = 'clicky' | 'thocky' | 'beep' | 'off';
 
 export function useSoundEffects() {
   const [profile, setProfile] = useState<SoundProfile>(() => {
-    return (localStorage.getItem('typeracer_sound_profile') as SoundProfile) || 'thocky';
+    return (localStorage.getItem('typothon_sound_profile') as SoundProfile) || 'thocky';
   });
   const [volume, setVolume] = useState<number>(0.3);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
-    localStorage.setItem('typeracer_sound_profile', profile);
+    localStorage.setItem('typothon_sound_profile', profile);
   }, [profile]);
 
   const initAudio = useCallback(() => {

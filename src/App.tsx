@@ -20,7 +20,7 @@ import { CountdownOverlay } from './components/CountdownOverlay';
 export default function App() {
   // Theme state
   const [theme, setTheme] = useState<ThemeId>(() => {
-    return (localStorage.getItem('typeracer_theme') as ThemeId) || 'cyberpunk';
+    return (localStorage.getItem('typothon_theme') as ThemeId) || 'cyberpunk';
   });
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
@@ -28,7 +28,7 @@ export default function App() {
   // Apply theme to document
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('typeracer_theme', theme);
+    localStorage.setItem('typothon_theme', theme);
   }, [theme]);
 
   // Race Mode & Target Text
@@ -236,7 +236,7 @@ export default function App() {
         <footer className="mt-8 flex flex-wrap items-center justify-between text-xs font-mono text-slate-500 py-4 border-t border-white/5">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-theme-primary animate-pulse" />
-            <span>TypeRacer Neo Engine // React 19 + Tailwind + Web Audio</span>
+            <span>Typothon Engine // React 19 + Tailwind + Web Audio</span>
           </div>
           <div className="flex items-center gap-4 text-[11px]">
             <span>Hotkeys: <kbd className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-400">Esc</kbd> restart</span>

@@ -24,7 +24,7 @@ export function useRaceRoom(
   const [roomId, setRoomId] = useState<string | null>(null);
   const [userId] = useState(() => 'pilot_' + Math.random().toString(36).substring(2, 7));
   const [userName, setUserName] = useState(() => {
-    return localStorage.getItem('typeracer_username') || `CyberPilot_${Math.floor(100 + Math.random() * 900)}`;
+    return localStorage.getItem('typothon_username') || `CyberPilot_${Math.floor(100 + Math.random() * 900)}`;
   });
   const [userAvatar, setUserAvatar] = useState(() => AVATARS[Math.floor(Math.random() * AVATARS.length)]);
   const [userColor, setUserColor] = useState(() => COLORS[0]);
@@ -35,7 +35,7 @@ export function useRaceRoom(
 
   // Save username
   useEffect(() => {
-    localStorage.setItem('typeracer_username', userName);
+    localStorage.setItem('typothon_username', userName);
   }, [userName]);
 
   // Setup BroadcastChannel when roomId changes
@@ -48,7 +48,7 @@ export function useRaceRoom(
       return;
     }
 
-    const channelName = `typeracer_room_${roomId}`;
+    const channelName = `typothon_room_${roomId}`;
     const channel = new BroadcastChannel(channelName);
     channelRef.current = channel;
 
