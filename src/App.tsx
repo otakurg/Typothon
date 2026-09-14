@@ -93,9 +93,17 @@ export default function App() {
   });
 
   // Multiplayer Room Hook
-  const handleRemoteStart = useCallback(() => {
+  const handleRemoteStart = useCallback((remotePayload?: { text: string; source?: string; mode: RaceMode }) => {
+    if (remotePayload?.text) {
+      setRaceData({ text: remotePayload.text, source: remotePayload.source });
+      if (remotePayload.mode) setMode(remotePayload.mode);
+      resetEngine();
+      resetBots();
+      setRaceResults(null);
+      setUserFinishTime(undefined);
+    }
     setStatus('countdown');
-  }, []);
+  }, [resetEngine, resetBots]);
 
   const {
     roomId,
@@ -111,6 +119,7 @@ export default function App() {
     broadcastStartCountdown,
     remoteRacers,
     remoteCount,
+    networkStatus,
   } = useRaceRoom(userProgress, netWpm, status === 'finished', handleRemoteStart);
 
   // User racer object
@@ -148,11 +157,11 @@ export default function App() {
 
   // Trigger countdown to launch
   const triggerCountdown = useCallback(() => {
-    setStatus('countdown');
     if (roomId) {
-      broadcastStartCountdown();
+      broadcastStartCountdown({ text: raceData.text, source: raceData.source, mode });
     }
-  }, [roomId, broadcastStartCountdown]);
+    setStatus('countdown');
+  }, [roomId, broadcastStartCountdown, raceData, mode]);
 
   // When countdown completes
   const handleCountdownComplete = useCallback(() => {
@@ -287,6 +296,7 @@ export default function App() {
         onLeaveRoom={leaveRoom}
         onStartRace={triggerCountdown}
         remoteCount={remoteCount}
+        networkStatus={networkStatus}
       />
     </div>
   );

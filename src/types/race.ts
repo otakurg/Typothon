@@ -58,7 +58,8 @@ export interface RaceResults {
 }
 
 export interface MultiTabMessage {
-  type: 'PLAYER_JOIN' | 'PLAYER_READY' | 'START_COUNTDOWN' | 'RACE_UPDATE' | 'PLAYER_FINISH' | 'RESET_RACE';
+  msgId?: string;
+  type: 'PLAYER_JOIN' | 'PLAYER_PONG' | 'PLAYER_READY' | 'START_COUNTDOWN' | 'RACE_UPDATE' | 'PLAYER_FINISH' | 'PLAYER_LEAVE' | 'RESET_RACE';
   roomId: string;
   senderId: string;
   senderName: string;
