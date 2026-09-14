@@ -16,6 +16,7 @@ import { ResultsModal } from './components/ResultsModal';
 import { ThemeSelector } from './components/ThemeSelector';
 import { RoomModal } from './components/RoomModal';
 import { CountdownOverlay } from './components/CountdownOverlay';
+import { LobbyCountdownBanner } from './components/LobbyCountdownBanner';
 
 export default function App() {
   // Theme state
@@ -44,7 +45,8 @@ export default function App() {
     setProfile: setSoundProfile,
     playKeySound,
     playCountdown,
-    playFinishFanfare
+    playFinishFanfare,
+    playLobbyTick,
   } = useSoundEffects();
 
   const handleToggleSound = useCallback(() => {
@@ -102,6 +104,7 @@ export default function App() {
       setRaceResults(null);
       setUserFinishTime(undefined);
     }
+    setIsRoomModalOpen(false);
     setStatus('countdown');
   }, [resetEngine, resetBots]);
 
@@ -116,11 +119,15 @@ export default function App() {
     createRoom,
     joinRoom,
     leaveRoom,
-    broadcastStartCountdown,
     remoteRacers,
+    remotePilots,
     remoteCount,
     networkStatus,
-  } = useRaceRoom(userProgress, netWpm, status === 'finished', handleRemoteStart);
+    allReady,
+    lobbyCountdown,
+    startLobbyCountdown,
+    forceLaunchNow,
+  } = useRaceRoom(userProgress, netWpm, status === 'finished', handleRemoteStart, playLobbyTick);
 
   // User racer object
   const userRacer: Racer = useMemo(() => ({
@@ -142,6 +149,13 @@ export default function App() {
     return [...racers, ...selectedBots];
   }, [userRacer, remoteRacers, bots]);
 
+  // Automatic 10-second F1 countdown trigger when all pilots click READY
+  useEffect(() => {
+    if (allReady && lobbyCountdown === null && status === 'idle') {
+      startLobbyCountdown({ text: raceData.text, source: raceData.source, mode });
+    }
+  }, [allReady, lobbyCountdown, status, startLobbyCountdown, raceData, mode]);
+
   // Reset / Start Race
   const startNewRace = useCallback((newMode?: RaceMode) => {
     const currentMode = newMode || mode;
@@ -155,13 +169,16 @@ export default function App() {
     setStatus('idle');
   }, [mode, resetEngine, resetBots]);
 
-  // Trigger countdown to launch
-  const triggerCountdown = useCallback(() => {
-    if (roomId) {
-      broadcastStartCountdown({ text: raceData.text, source: raceData.source, mode });
+  // Manual Trigger from Solo Mode
+  const triggerSoloStart = useCallback(() => {
+    if (roomId && remoteCount > 0) {
+      // In multiplayer, skip 10s and launch now
+      forceLaunchNow({ text: raceData.text, source: raceData.source, mode });
+    } else {
+      // In solo mode, instant launch countdown
+      setStatus('countdown');
     }
-    setStatus('countdown');
-  }, [roomId, broadcastStartCountdown, raceData, mode]);
+  }, [roomId, remoteCount, forceLaunchNow, raceData, mode]);
 
   // When countdown completes
   const handleCountdownComplete = useCallback(() => {
@@ -171,7 +188,6 @@ export default function App() {
   // Global hotkeys (Tab + Enter or Esc)
   useEffect(() => {
     const handleGlobalKey = (e: KeyboardEvent) => {
-      // Tab + Enter or Ctrl + Enter
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         startNewRace();
@@ -213,6 +229,18 @@ export default function App() {
           onRestart={() => startNewRace()}
         />
 
+        {/* F1 Grid Launch 10-Second Countdown Banner (When all players ready) */}
+        {lobbyCountdown !== null && (
+          <LobbyCountdownBanner
+            countdown={lobbyCountdown}
+            userName={userName}
+            userAvatar={userAvatar}
+            remotePilots={remotePilots}
+            onForceLaunch={() => forceLaunchNow({ text: raceData.text, source: raceData.source, mode })}
+            onAbort={toggleReady}
+          />
+        )}
+
         {/* Live Race Track */}
         <RaceTrack racers={allRacers} />
 
@@ -237,7 +265,7 @@ export default function App() {
           currentInput={currentInput}
           onKeyDown={handleKeyDown}
           onRestart={() => startNewRace()}
-          isLocked={status === 'countdown' || status === 'finished'}
+          isLocked={status === 'countdown' || status === 'finished' || lobbyCountdown !== null}
           quoteSource={raceData.source}
         />
 
@@ -294,9 +322,12 @@ export default function App() {
         onCreateRoom={createRoom}
         onJoinRoom={joinRoom}
         onLeaveRoom={leaveRoom}
-        onStartRace={triggerCountdown}
+        onStartRace={triggerSoloStart}
         remoteCount={remoteCount}
         networkStatus={networkStatus}
+        remotePilots={remotePilots}
+        allReady={allReady}
+        lobbyCountdown={lobbyCountdown}
       />
     </div>
   );

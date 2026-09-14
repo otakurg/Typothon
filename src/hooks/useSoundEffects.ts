@@ -151,6 +151,29 @@ export function useSoundEffects() {
     });
   }, [profile, volume, initAudio]);
 
+  const playLobbyTick = useCallback((secondsRemaining: number) => {
+    if (profile === 'off') return;
+    initAudio();
+    const ctx = audioCtxRef.current;
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    const freq = secondsRemaining <= 3 ? 987.77 : 587.33;
+    osc.frequency.setValueAtTime(freq, now);
+
+    gain.gain.setValueAtTime(volume * 0.22, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.08);
+  }, [profile, volume, initAudio]);
+
   return {
     profile,
     setProfile,
@@ -159,6 +182,7 @@ export function useSoundEffects() {
     playKeySound,
     playCountdown,
     playFinishFanfare,
+    playLobbyTick,
     initAudio
   };
 }

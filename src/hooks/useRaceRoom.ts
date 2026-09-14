@@ -25,7 +25,8 @@ export function useRaceRoom(
   userProgress: number,
   userWpm: number,
   isUserFinished: boolean,
-  onRemoteStart?: (payload?: { text: string; source?: string; mode: RaceMode }) => void
+  onRemoteStart?: (payload?: { text: string; source?: string; mode: RaceMode }) => void,
+  onLobbyTick?: (sec: number) => void
 ) {
   const [roomId, setRoomId] = useState<string | null>(null);
   const [userId] = useState(() => 'pilot_' + Math.random().toString(36).substring(2, 7));
@@ -36,6 +37,11 @@ export function useRaceRoom(
   const [userColor, setUserColor] = useState(() => COLORS[0]);
   const [isReady, setIsReady] = useState(false);
   const [networkStatus, setNetworkStatus] = useState<'connected' | 'connecting' | 'offline'>('offline');
+
+  // 10-second synchronized lobby countdown state
+  const [lobbyCountdown, setLobbyCountdown] = useState<number | null>(null);
+  const lobbyTargetTimeRef = useRef<number | null>(null);
+  const lobbyPayloadRef = useRef<{ text: string; source?: string; mode: RaceMode } | null>(null);
 
   const [remoteParticipants, setRemoteParticipants] = useState<Record<string, RoomParticipant>>({});
   const channelRef = useRef<BroadcastChannel | null>(null);
@@ -83,6 +89,14 @@ export function useRaceRoom(
     }
   }, [roomId, userId, userName]);
 
+  // Cancel any active lobby countdown
+  const cancelLobbyCountdown = useCallback((reason?: string) => {
+    lobbyTargetTimeRef.current = null;
+    lobbyPayloadRef.current = null;
+    setLobbyCountdown(null);
+    broadcastMessage('LOBBY_COUNTDOWN_CANCEL', { reason });
+  }, [broadcastMessage]);
+
   // Handle incoming message from either transport
   const handleIncomingMessage = useCallback((msg: MultiTabMessage) => {
     if (!msg || msg.senderId === userId) return;
@@ -91,7 +105,6 @@ export function useRaceRoom(
     if (msg.msgId) {
       if (seenMsgIdsRef.current.has(msg.msgId)) return;
       seenMsgIdsRef.current.add(msg.msgId);
-      // Cap deduplication cache size
       if (seenMsgIdsRef.current.size > 200) {
         const firstItems = Array.from(seenMsgIdsRef.current).slice(0, 50);
         firstItems.forEach(id => seenMsgIdsRef.current.delete(id));
@@ -149,9 +162,34 @@ export function useRaceRoom(
             }
           };
         });
+        // If a player unreadies, abort any active countdown!
+        if (!msg.payload?.isReady) {
+          lobbyTargetTimeRef.current = null;
+          lobbyPayloadRef.current = null;
+          setLobbyCountdown(null);
+        }
+        break;
+
+      case 'LOBBY_COUNTDOWN_START':
+        if (msg.payload?.targetStartTime) {
+          lobbyTargetTimeRef.current = msg.payload.targetStartTime;
+          lobbyPayloadRef.current = msg.payload;
+          const initialRemaining = Math.max(1, Math.ceil((msg.payload.targetStartTime - Date.now()) / 1000));
+          setLobbyCountdown(initialRemaining);
+          onLobbyTick?.(initialRemaining);
+        }
+        break;
+
+      case 'LOBBY_COUNTDOWN_CANCEL':
+        lobbyTargetTimeRef.current = null;
+        lobbyPayloadRef.current = null;
+        setLobbyCountdown(null);
         break;
 
       case 'START_COUNTDOWN':
+        lobbyTargetTimeRef.current = null;
+        lobbyPayloadRef.current = null;
+        setLobbyCountdown(null);
         onRemoteStart?.(msg.payload);
         break;
 
@@ -206,6 +244,9 @@ export function useRaceRoom(
           delete next[msg.senderId];
           return next;
         });
+        lobbyTargetTimeRef.current = null;
+        lobbyPayloadRef.current = null;
+        setLobbyCountdown(null);
         break;
 
       case 'RESET_RACE':
@@ -217,9 +258,12 @@ export function useRaceRoom(
           return next;
         });
         setIsReady(false);
+        lobbyTargetTimeRef.current = null;
+        lobbyPayloadRef.current = null;
+        setLobbyCountdown(null);
         break;
     }
-  }, [userId, userAvatar, userColor, isReady, broadcastMessage, onRemoteStart]);
+  }, [userId, userAvatar, userColor, isReady, broadcastMessage, onRemoteStart, onLobbyTick]);
 
   // Setup connection when roomId changes
   useEffect(() => {
@@ -261,7 +305,7 @@ export function useRaceRoom(
       setNetworkStatus('connected');
       client.subscribe(topic, { qos: 0 }, (err) => {
         if (!err) {
-          // Announce join to the world!
+          // Announce join to the room!
           broadcastMessage('PLAYER_JOIN', {
             avatar: userAvatar,
             color: userColor,
@@ -282,7 +326,6 @@ export function useRaceRoom(
 
     client.on('error', (err) => {
       console.warn('Primary MQTT broker error, attempting fallback...', err);
-      // If primary fails, fallback to secondary broker
       if (mqttClientRef.current === client) {
         client.end(true);
         const fallbackClient = mqtt.connect(MQTT_BROKER_FALLBACK, {
@@ -336,11 +379,41 @@ export function useRaceRoom(
     };
   }, [roomId, userId, userAvatar, userColor, isReady, broadcastMessage, handleIncomingMessage]);
 
+  // 10-second lobby countdown interval runner
+  useEffect(() => {
+    if (!lobbyTargetTimeRef.current) return;
+
+    const interval = setInterval(() => {
+      if (!lobbyTargetTimeRef.current) {
+        clearInterval(interval);
+        return;
+      }
+      const now = Date.now();
+      const diff = lobbyTargetTimeRef.current - now;
+      const remainingSec = Math.max(0, Math.ceil(diff / 1000));
+
+      setLobbyCountdown(remainingSec);
+      if (remainingSec > 0) {
+        onLobbyTick?.(remainingSec);
+      }
+
+      if (diff <= 0) {
+        clearInterval(interval);
+        const payload = lobbyPayloadRef.current;
+        lobbyTargetTimeRef.current = null;
+        lobbyPayloadRef.current = null;
+        setLobbyCountdown(null);
+        onRemoteStart?.(payload || undefined);
+      }
+    }, 200);
+
+    return () => clearInterval(interval);
+  }, [lobbyCountdown, onLobbyTick, onRemoteStart]);
+
   // Broadcast race update when user progress or WPM changes (throttled)
   useEffect(() => {
     if (!roomId) return;
     const now = Date.now();
-    // Throttle progress updates to ~120ms to avoid saturating network
     if (now - lastProgressSentRef.current >= 120 || userProgress >= 100) {
       lastProgressSentRef.current = now;
       broadcastMessage('RACE_UPDATE', {
@@ -382,19 +455,45 @@ export function useRaceRoom(
     setRemoteParticipants({});
     setIsReady(false);
     setNetworkStatus('offline');
+    lobbyTargetTimeRef.current = null;
+    lobbyPayloadRef.current = null;
+    setLobbyCountdown(null);
   }, [broadcastMessage]);
 
   const toggleReady = useCallback(() => {
     setIsReady(prev => {
       const next = !prev;
       broadcastMessage('PLAYER_READY', { isReady: next });
+      if (!next) {
+        // If unreadying, cancel countdown
+        cancelLobbyCountdown('Local pilot unreadied');
+      }
       return next;
     });
-  }, [broadcastMessage]);
+  }, [broadcastMessage, cancelLobbyCountdown]);
 
-  const broadcastStartCountdown = useCallback((racePayload?: { text: string; source?: string; mode: RaceMode }) => {
+  // Start 10-second lobby countdown
+  const startLobbyCountdown = useCallback((racePayload: { text: string; source?: string; mode: RaceMode }) => {
+    const targetStartTime = Date.now() + 10000;
+    lobbyTargetTimeRef.current = targetStartTime;
+    lobbyPayloadRef.current = racePayload;
+    setLobbyCountdown(10);
+    onLobbyTick?.(10);
+
+    broadcastMessage('LOBBY_COUNTDOWN_START', {
+      ...racePayload,
+      targetStartTime,
+    });
+  }, [broadcastMessage, onLobbyTick]);
+
+  // Skip 10s wait and launch race now
+  const forceLaunchNow = useCallback((racePayload?: { text: string; source?: string; mode: RaceMode }) => {
+    lobbyTargetTimeRef.current = null;
+    lobbyPayloadRef.current = null;
+    setLobbyCountdown(null);
     broadcastMessage('START_COUNTDOWN', racePayload);
-  }, [broadcastMessage]);
+    onRemoteStart?.(racePayload);
+  }, [broadcastMessage, onRemoteStart]);
 
   // Convert remote participants to Racer format
   const remoteRacers: Racer[] = Object.values(remoteParticipants).map(p => ({
@@ -407,6 +506,11 @@ export function useRaceRoom(
     currentWpm: p.currentWpm,
     finishTime: p.finishTime,
   }));
+
+  // Has all participants ready
+  const remoteList = Object.values(remoteParticipants);
+  const hasRemotePilots = remoteList.length > 0;
+  const allReady = hasRemotePilots && isReady && remoteList.every(p => p.isReady);
 
   return {
     roomId,
@@ -422,9 +526,14 @@ export function useRaceRoom(
     createRoom,
     joinRoom,
     leaveRoom,
-    broadcastStartCountdown,
     remoteRacers,
-    remoteCount: Object.keys(remoteParticipants).length,
+    remotePilots: remoteList,
+    remoteCount: remoteList.length,
     networkStatus,
+    allReady,
+    lobbyCountdown,
+    startLobbyCountdown,
+    cancelLobbyCountdown,
+    forceLaunchNow,
   };
 }
