@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Default Cyberpunk Neon */
+  --theme-bg: #090a0f;
+  --theme-card: rgba(13, 15, 23, 0.75);
+  --theme-border: rgba(0, 245, 255, 0.18);
+  --theme-text: #e2e8f0;
+  --theme-subtext: #64748b;
+  --theme-primary: #00f5ff;
+  --theme-secondary: #bd00ff;
+  --theme-accent: #39ff14;
+  --theme-error: #ff3366;
+  --theme-warning: #ffe600;
+  --theme-glow: 0 0 20px rgba(0, 245, 255, 0.4);
+}
+
+[data-theme="amber"] {
+  --theme-bg: #0c0d0a;
+  --theme-card: rgba(22, 24, 18, 0.8);
+  --theme-border: rgba(255, 176, 0, 0.25);
+  --theme-text: #ffde8a;
+  --theme-subtext: #967d3e;
+  --theme-primary: #ffb000;
+  --theme-secondary: #ff8400;
+  --theme-accent: #ffd24d;
+  --theme-error: #ff3838;
+  --theme-warning: #ffd000;
+  --theme-glow: 0 0 20px rgba(255, 176, 0, 0.4);
+}
+
+[data-theme="dracula"] {
+  --theme-bg: #15161e;
+  --theme-card: rgba(33, 35, 48, 0.8);
+  --theme-border: rgba(189, 147, 249, 0.25);
+  --theme-text: #f8f8f2;
+  --theme-subtext: #6272a4;
+  --theme-primary: #bd93f9;
+  --theme-secondary: #ff79c6;
+  --theme-accent: #50fa7b;
+  --theme-error: #ff5555;
+  --theme-warning: #f1fa8c;
+  --theme-glow: 0 0 20px rgba(189, 147, 249, 0.4);
+}
+
+body {
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+  min-height: 100vh;
+  font-family: 'JetBrains Mono', monospace;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Cyber Grid Background */
+.cyber-grid {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+
+/* Glass panel */
+.glass-panel {
+  background-color: var(--theme-card);
+  border: 1px solid var(--theme-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Custom glowing borders */
+.glow-primary {
+  box-shadow: 0 0 15px var(--theme-primary);
+}
+
+.glow-border {
+  border-color: var(--theme-primary);
+  box-shadow: 0 0 12px rgba(var(--theme-primary), 0.3);
+}
+
+/* CRT Scanline overlay */
+.crt-overlay::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+  background-size: 100% 4px;
+  z-index: 40;
+  pointer-events: none;
+  opacity: 0.35;
+}
+
+/* Smooth custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-primary);
+}
