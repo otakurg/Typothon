@@ -1,7 +1,7 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { Racer } from '../types/race';
-import { Trophy, Zap, Flag } from 'lucide-react';
+import { Trophy, Zap, Flag, AlertTriangle } from 'lucide-react';
 
 interface RaceTrackProps {
   racers: Racer[];
@@ -56,6 +56,8 @@ export const RaceTrack: React.FC<RaceTrackProps> = ({ racers }) => {
         {racers.map((racer) => {
           const rank = getRankBadge(racer.id);
           const isUser = racer.isUser;
+          const isDnf = racer.isDnf;
+          const isAfk = racer.isAfk;
 
           return (
             <div
@@ -63,21 +65,26 @@ export const RaceTrack: React.FC<RaceTrackProps> = ({ racers }) => {
               className={`relative h-12 rounded-xl flex items-center px-3 transition-all duration-300 ${
                 isUser
                   ? 'bg-gradient-to-r from-theme-primary/[0.08] via-theme-primary/[0.03] to-transparent border border-theme-primary/30 shadow-[0_0_15px_rgba(0,245,255,0.06)]'
+                  : isDnf
+                  ? 'bg-red-950/20 border border-red-500/20 opacity-70'
                   : 'bg-black/25 border border-white/[0.04]'
               }`}
             >
-              {/* Lane Info (Rank & Name) */}
-              <div className="flex items-center gap-2 w-28 sm:w-36 flex-shrink-0 z-20">
+              {/* Lane Info (Rank & Name & Host Crown) */}
+              <div className="flex items-center gap-2 w-32 sm:w-40 flex-shrink-0 z-20">
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${rank.color}`}>
                   {rank.label}
                 </span>
                 <span
-                  className={`text-xs truncate font-medium ${
+                  className={`text-xs truncate font-medium flex items-center gap-1 ${
                     isUser ? 'text-theme-primary font-bold' : 'text-slate-300'
                   }`}
                   title={racer.name}
                 >
-                  {isUser ? `${racer.name} (YOU)` : racer.name}
+                  {racer.isHost && (
+                    <span title="Room Host" className="text-amber-400 text-xs">👑</span>
+                  )}
+                  <span className="truncate">{isUser ? `${racer.name} (YOU)` : racer.name}</span>
                 </span>
               </div>
 
@@ -91,13 +98,30 @@ export const RaceTrack: React.FC<RaceTrackProps> = ({ racers }) => {
                   }}
                   transition={{ type: 'spring', stiffness: 120, damping: 20 }}
                 >
+                  {/* Floating Tactical Radio Speech Bubble */}
+                  <AnimatePresence>
+                    {racer.chatBubble && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.8 }}
+                        animate={{ opacity: 1, y: -28, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.7 }}
+                        className="absolute left-0 -top-1 whitespace-nowrap bg-theme-primary/95 text-black text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg shadow-[0_0_15px_var(--theme-primary)] pointer-events-none z-30 flex items-center gap-1"
+                      >
+                        <span>{racer.chatBubble.message}</span>
+                        <div className="absolute left-3 -bottom-1 w-2 h-2 bg-theme-primary/95 rotate-45" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   {/* Glowing Speed Thruster Trail */}
                   <div
                     className="h-1.5 rounded-full mr-1 transition-all duration-200"
                     style={{
                       width: racer.currentWpm > 0 ? `${Math.min(60, Math.max(12, racer.currentWpm * 0.45))}px` : '4px',
-                      background: `linear-gradient(to right, transparent, ${racer.color})`,
-                      boxShadow: `0 0 10px ${racer.color}`,
+                      background: isDnf 
+                        ? 'linear-gradient(to right, transparent, #ef4444)' 
+                        : `linear-gradient(to right, transparent, ${racer.color})`,
+                      boxShadow: isDnf ? '0 0 10px #ef4444' : `0 0 10px ${racer.color}`,
                     }}
                   />
 
@@ -106,10 +130,12 @@ export const RaceTrack: React.FC<RaceTrackProps> = ({ racers }) => {
                     className={`relative w-8 h-8 rounded-lg flex items-center justify-center text-sm shadow-lg border transition-transform duration-200 ${
                       isUser
                         ? 'border-theme-primary bg-theme-primary/20 scale-110 shadow-[0_0_12px_var(--theme-primary)]'
+                        : isDnf
+                        ? 'border-red-500 bg-red-950/60 shadow-[0_0_10px_rgba(239,68,68,0.4)]'
                         : 'border-white/20 bg-slate-900/80'
                     }`}
                   >
-                    <span>{racer.avatar}</span>
+                    <span>{isDnf ? '⚠️' : racer.avatar}</span>
                     {racer.progress >= 100 && (
                       <span className="absolute -top-1 -right-1 flex h-3 w-3">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -118,12 +144,24 @@ export const RaceTrack: React.FC<RaceTrackProps> = ({ racers }) => {
                     )}
                   </div>
 
-                  {/* Floating WPM Tag */}
+                  {/* Floating WPM Tag or AFK/DNF status */}
                   <div className="ml-2 flex items-center gap-1 text-[11px] font-mono whitespace-nowrap bg-black/70 backdrop-blur px-1.5 py-0.5 rounded border border-white/10">
-                    <span className="font-bold" style={{ color: racer.color }}>
-                      {racer.currentWpm}
-                    </span>
-                    <span className="text-[9px] text-slate-400">WPM</span>
+                    {isDnf ? (
+                      <span className="font-bold text-red-400 text-[10px] flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> DNF / LEFT
+                      </span>
+                    ) : isAfk ? (
+                      <span className="font-bold text-amber-400 text-[10px]">
+                        AFK
+                      </span>
+                    ) : (
+                      <>
+                        <span className="font-bold" style={{ color: racer.color }}>
+                          {racer.currentWpm}
+                        </span>
+                        <span className="text-[9px] text-slate-400">WPM</span>
+                      </>
+                    )}
                   </div>
                 </motion.div>
               </div>

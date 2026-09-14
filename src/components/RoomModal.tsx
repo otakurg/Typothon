@@ -12,9 +12,14 @@ import {
   Wifi,
   Globe,
   Clock,
-  Zap
+  Zap,
+  Crown,
+  Bot,
+  Link,
+  BotOff
 } from 'lucide-react';
 import type { RoomParticipant } from '../hooks/useRaceRoom';
+import { QuickChatBar } from './QuickChatBar';
 
 interface RoomModalProps {
   isOpen: boolean;
@@ -35,6 +40,11 @@ interface RoomModalProps {
   remotePilots?: RoomParticipant[];
   allReady?: boolean;
   lobbyCountdown?: number | null;
+  isHost?: boolean;
+  includeBots?: boolean;
+  onToggleIncludeBots?: (val: boolean) => void;
+  onSendQuickChat?: (msg: string) => void;
+  getInviteLink?: () => string;
 }
 
 const AVATAR_OPTIONS = ['🚀', '⚡', '🛸', '🏎️', '🏍️', '👾', '🤖', '🔥'];
@@ -58,9 +68,15 @@ export const RoomModal: React.FC<RoomModalProps> = ({
   remotePilots = [],
   allReady = false,
   lobbyCountdown = null,
+  isHost = false,
+  includeBots = true,
+  onToggleIncludeBots,
+  onSendQuickChat,
+  getInviteLink,
 }) => {
   const [joinCodeInput, setJoinCodeInput] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   if (!isOpen) return null;
 
@@ -68,8 +84,19 @@ export const RoomModal: React.FC<RoomModalProps> = ({
     if (!roomId) return;
     try {
       await navigator.clipboard.writeText(roomId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleCopyInviteLink = async () => {
+    const link = getInviteLink?.() || `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
     } catch (e) {
       console.error(e);
     }
@@ -92,16 +119,23 @@ export const RoomModal: React.FC<RoomModalProps> = ({
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className="w-full max-w-lg glass-panel rounded-3xl p-6 sm:p-8 border border-white/10 shadow-2xl relative my-6"
+        className="w-full max-w-lg glass-panel rounded-3xl p-6 sm:p-8 border border-white/10 shadow-2xl relative my-6 max-h-[92vh] overflow-y-auto"
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-5">
           <div className="flex items-center gap-2.5">
             <Users className="w-5 h-5 text-theme-primary" />
             <div>
-              <h3 className="text-lg font-bold font-display text-white tracking-wide uppercase">
-                Multiplayer Network Arena
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-bold font-display text-white tracking-wide uppercase">
+                  Multiplayer Network Arena
+                </h3>
+                {roomId && isHost && (
+                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-400 font-bold border border-amber-400/30 flex items-center gap-1">
+                    <Crown className="w-3 h-3" /> HOST
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-1.5 text-[10px] font-mono mt-0.5">
                 {networkStatus === 'connected' ? (
                   <span className="text-cyber-lime flex items-center gap-1 font-semibold">
@@ -171,28 +205,83 @@ export const RoomModal: React.FC<RoomModalProps> = ({
         {/* Room State: Active Room vs Create/Join */}
         {roomId ? (
           <div className="flex flex-col gap-4">
-            {/* Room Code Badge */}
-            <div className="p-4 rounded-2xl bg-theme-primary/[0.07] border border-theme-primary/30 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-theme-primary uppercase tracking-widest font-semibold">
-                    Active Room Code
-                  </span>
-                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyber-lime/20 text-cyber-lime font-mono font-bold">
-                    LIVE
+            {/* Room Code & 1-Click Invite Link */}
+            <div className="p-4 rounded-2xl bg-theme-primary/[0.07] border border-theme-primary/30 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-theme-primary uppercase tracking-widest font-semibold">
+                      Active Room Code
+                    </span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyber-lime/20 text-cyber-lime font-mono font-bold">
+                      LIVE
+                    </span>
+                  </div>
+                  <span className="text-2xl font-black font-mono text-white tracking-widest mt-0.5 block">
+                    {roomId}
                   </span>
                 </div>
-                <span className="text-2xl font-black font-mono text-white tracking-widest mt-0.5 block">
-                  {roomId}
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleCopyCode}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-mono text-white transition-all"
+                  >
+                    {copiedCode ? <Check className="w-4 h-4 text-cyber-lime" /> : <Copy className="w-4 h-4" />}
+                    <span>{copiedCode ? 'Copied' : 'Copy Code'}</span>
+                  </button>
+                  <button
+                    onClick={handleCopyInviteLink}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-theme-primary/20 hover:bg-theme-primary/30 border border-theme-primary/40 text-xs font-mono text-theme-primary font-bold transition-all"
+                    title="Copy 1-Click Invite Link to clipboard"
+                  >
+                    {copiedLink ? <Check className="w-4 h-4 text-cyber-lime" /> : <Link className="w-4 h-4" />}
+                    <span>{copiedLink ? 'Link Copied!' : 'Copy Link'}</span>
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={handleCopyCode}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-mono text-white transition-all"
-              >
-                {copied ? <Check className="w-4 h-4 text-cyber-lime" /> : <Copy className="w-4 h-4" />}
-                <span>{copied ? 'Copied' : 'Copy Code'}</span>
-              </button>
+            </div>
+
+            {/* Host Control: Bot Toggle */}
+            <div className="p-3.5 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                {includeBots ? (
+                  <Bot className="w-4 h-4 text-theme-primary" />
+                ) : (
+                  <BotOff className="w-4 h-4 text-slate-400" />
+                )}
+                <div>
+                  <span className="text-xs font-mono font-bold text-white block">
+                    Fill Empty Lanes with AI Bots
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400">
+                    {isHost 
+                      ? (includeBots ? 'AI Bots enabled to fill up to 4 lanes' : 'Human-only race (pure 1v1 / human duel)')
+                      : `Rule set by Host: ${includeBots ? 'Bots ON' : 'Bots OFF (Human-only)'}`
+                    }
+                  </span>
+                </div>
+              </div>
+
+              {isHost ? (
+                <button
+                  onClick={() => onToggleIncludeBots?.(!includeBots)}
+                  className={`w-12 h-6 rounded-full transition-colors relative p-0.5 ${
+                    includeBots ? 'bg-theme-primary' : 'bg-white/10'
+                  }`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full bg-black transition-transform ${
+                      includeBots ? 'translate-x-6' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              ) : (
+                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                  includeBots ? 'bg-theme-primary/20 text-theme-primary' : 'bg-white/10 text-slate-400'
+                }`}>
+                  {includeBots ? 'ENABLED' : 'DISABLED'}
+                </span>
+              )}
             </div>
 
             {/* Pilot Readiness Roster */}
@@ -203,34 +292,46 @@ export const RoomModal: React.FC<RoomModalProps> = ({
               </div>
 
               {/* Local Player Card */}
-              <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/5">
                 <div className="flex items-center gap-2">
                   <span className="text-base">{userAvatar}</span>
-                  <span className="text-xs font-mono font-bold text-theme-primary">
-                    {userName} <span className="text-[10px] text-slate-400 font-normal">(YOU)</span>
+                  <div className="flex items-center gap-1.5 font-mono text-xs">
+                    {isHost && <span title="Room Host" className="text-amber-400">👑</span>}
+                    <span className="font-bold text-theme-primary">{userName}</span>
+                    <span className="text-[10px] text-slate-400">(YOU)</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                    isReady ? 'bg-cyber-lime/20 text-cyber-lime border border-cyber-lime/30' : 'bg-amber-400/20 text-amber-400'
+                  }`}>
+                    {isReady ? 'READY' : 'PREPARING'}
                   </span>
                 </div>
-                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                  isReady ? 'bg-cyber-lime/20 text-cyber-lime border border-cyber-lime/30' : 'bg-amber-400/20 text-amber-400'
-                }`}>
-                  {isReady ? 'READY' : 'PREPARING'}
-                </span>
               </div>
 
               {/* Remote Players List */}
               {remotePilots.map((pilot) => (
-                <div key={pilot.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5">
+                <div key={pilot.id} className="flex items-center justify-between p-2.5 rounded-xl bg-white/5 border border-white/5">
                   <div className="flex items-center gap-2">
                     <span className="text-base">{pilot.avatar}</span>
-                    <span className="text-xs font-mono text-white font-medium">
-                      {pilot.name}
+                    <div className="flex items-center gap-1.5 font-mono text-xs text-white">
+                      {pilot.isHost && <span title="Room Host" className="text-amber-400">👑</span>}
+                      <span>{pilot.name}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {pilot.isAfk && (
+                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                        AFK
+                      </span>
+                    )}
+                    <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                      pilot.isReady ? 'bg-cyber-lime/20 text-cyber-lime border border-cyber-lime/30' : 'bg-amber-400/20 text-amber-400'
+                    }`}>
+                      {pilot.isReady ? 'READY' : 'PREPARING'}
                     </span>
                   </div>
-                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
-                    pilot.isReady ? 'bg-cyber-lime/20 text-cyber-lime border border-cyber-lime/30' : 'bg-amber-400/20 text-amber-400'
-                  }`}>
-                    {pilot.isReady ? 'READY' : 'PREPARING'}
-                  </span>
                 </div>
               ))}
 
@@ -259,6 +360,11 @@ export const RoomModal: React.FC<RoomModalProps> = ({
                   {lobbyCountdown < 10 ? `0${lobbyCountdown}` : lobbyCountdown}s
                 </span>
               </div>
+            )}
+
+            {/* Tactical Radio Comms */}
+            {onSendQuickChat && (
+              <QuickChatBar onSendChat={onSendQuickChat} />
             )}
 
             {/* Status Guide */}

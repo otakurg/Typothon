@@ -19,14 +19,21 @@ import {
   Flame, 
   Target, 
   Clock, 
-  Activity 
+  Activity,
+  Trophy,
+  Swords
 } from 'lucide-react';
+import { QuickChatBar } from './QuickChatBar';
 
 interface ResultsModalProps {
   results: RaceResults;
   allRacers: Racer[];
   onPlayAgain: () => void;
   onNextTrack: () => void;
+  seriesScores?: Record<string, number>;
+  onRematch?: () => void;
+  onSendQuickChat?: (phrase: string) => void;
+  isMultiplayer?: boolean;
 }
 
 export const ResultsModal: React.FC<ResultsModalProps> = ({
@@ -34,6 +41,10 @@ export const ResultsModal: React.FC<ResultsModalProps> = ({
   allRacers,
   onPlayAgain,
   onNextTrack,
+  seriesScores = {},
+  onRematch,
+  onSendQuickChat,
+  isMultiplayer = false,
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -177,6 +188,45 @@ Play: Typothon (Cyberpunk Edition)`;
             </button>
           </div>
         </div>
+
+        {/* Series Scoreboard / Rematch Banner in Multiplayer */}
+        {isMultiplayer && (
+          <div className="my-5 p-3.5 sm:p-4 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex flex-wrap items-center justify-between gap-3 shadow-[0_0_20px_rgba(251,191,36,0.15)]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-400">
+                <Trophy className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-[10px] font-mono text-amber-400 uppercase tracking-wider font-bold block">
+                  Head-to-Head Series Score
+                </span>
+                <div className="flex items-center gap-3 text-xs sm:text-sm font-mono mt-0.5">
+                  {Object.entries(seriesScores).length > 0 ? (
+                    Object.entries(seriesScores).map(([name, score], idx) => (
+                      <span key={name} className="flex items-center gap-1.5">
+                        {idx > 0 && <span className="text-slate-500 font-bold">vs</span>}
+                        <span className="text-white font-bold">{name}</span>
+                        <span className="bg-black/80 px-2 py-0.5 rounded font-black text-cyber-lime border border-amber-400/30">{score}</span>
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-slate-400 text-xs">Series in progress • First round completed</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {onRematch && (
+              <button
+                onClick={onRematch}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-black font-mono font-bold text-xs hover:brightness-110 shadow-[0_0_15px_rgba(251,191,36,0.3)] transition-all flex items-center gap-1.5 transform hover:scale-105"
+              >
+                <Swords className="w-3.5 h-3.5" />
+                <span>Instant Rematch</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Primary Headline Stats Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 my-6">
@@ -377,6 +427,13 @@ Play: Typothon (Cyberpunk Edition)`;
           </div>
         </div>
 
+        {/* Post-race Quick Chat Comms in Multiplayer */}
+        {isMultiplayer && onSendQuickChat && (
+          <div className="mb-6">
+            <QuickChatBar onSendChat={onSendQuickChat} />
+          </div>
+        )}
+
         {/* Modal Actions */}
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-6">
           <span className="text-xs font-mono text-slate-500">
@@ -392,13 +449,23 @@ Play: Typothon (Cyberpunk Edition)`;
               <ArrowRight className="w-4 h-4" />
             </button>
 
-            <button
-              onClick={onPlayAgain}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-theme-primary to-theme-secondary text-black font-bold text-xs font-mono shadow-[0_0_20px_var(--theme-primary)] hover:opacity-95 flex items-center gap-2 transition-all transform hover:scale-[1.02]"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>Play Again</span>
-            </button>
+            {isMultiplayer && onRematch ? (
+              <button
+                onClick={onRematch}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-black font-bold text-xs font-mono shadow-[0_0_20px_rgba(251,191,36,0.35)] hover:brightness-110 flex items-center gap-2 transition-all transform hover:scale-[1.02]"
+              >
+                <Swords className="w-4 h-4" />
+                <span>Instant Rematch</span>
+              </button>
+            ) : (
+              <button
+                onClick={onPlayAgain}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-theme-primary to-theme-secondary text-black font-bold text-xs font-mono shadow-[0_0_20px_var(--theme-primary)] hover:opacity-95 flex items-center gap-2 transition-all transform hover:scale-[1.02]"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Play Again</span>
+              </button>
+            )}
           </div>
         </div>
       </motion.div>

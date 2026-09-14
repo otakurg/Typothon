@@ -19,6 +19,10 @@ export interface Racer {
   rank?: number;
   finishTime?: number; // timestamp or elapsed seconds
   difficulty?: 'easy' | 'medium' | 'hard';
+  isHost?: boolean;
+  isAfk?: boolean;
+  isDnf?: boolean;
+  chatBubble?: { message: string; timestamp: number };
 }
 
 export interface KeystrokeRecord {
@@ -55,13 +59,34 @@ export interface RaceResults {
   timeline: SecondTelemetry[];
   rank: number;
   racers: Racer[];
+  seriesScores?: Record<string, number>;
 }
 
 export interface MultiTabMessage {
   msgId?: string;
-  type: 'PLAYER_JOIN' | 'PLAYER_PONG' | 'PLAYER_READY' | 'START_COUNTDOWN' | 'LOBBY_COUNTDOWN_START' | 'LOBBY_COUNTDOWN_CANCEL' | 'RACE_UPDATE' | 'PLAYER_FINISH' | 'PLAYER_LEAVE' | 'RESET_RACE';
+  type: 
+    | 'PLAYER_JOIN' 
+    | 'PLAYER_PONG' 
+    | 'PLAYER_READY' 
+    | 'PLAYER_AFK'
+    | 'START_COUNTDOWN' 
+    | 'LOBBY_COUNTDOWN_START' 
+    | 'LOBBY_COUNTDOWN_CANCEL' 
+    | 'RACE_UPDATE' 
+    | 'PLAYER_FINISH' 
+    | 'PLAYER_LEAVE' 
+    | 'RESET_RACE'
+    | 'QUICK_CHAT'
+    | 'HOST_SETTINGS';
   roomId: string;
   senderId: string;
   senderName: string;
   payload?: any;
+}
+
+export interface ToastNotification {
+  id: string;
+  text: string;
+  type: 'info' | 'warn' | 'success';
+  timestamp: number;
 }

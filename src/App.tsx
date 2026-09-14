@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { RaceMode, RaceStatus, ThemeId, Racer, RaceResults } from './types/race';
 import { THEMES } from './constants/themes';
 import { generateRaceText } from './constants/words';
@@ -17,6 +17,7 @@ import { ThemeSelector } from './components/ThemeSelector';
 import { RoomModal } from './components/RoomModal';
 import { CountdownOverlay } from './components/CountdownOverlay';
 import { LobbyCountdownBanner } from './components/LobbyCountdownBanner';
+import { CyberToast } from './components/CyberToast';
 
 export default function App() {
   // Theme state
@@ -58,13 +59,35 @@ export default function App() {
     });
   }, [setSoundProfile]);
 
-  // Handle Race finish
-  const handleRaceFinish = useCallback((results: RaceResults) => {
-    setStatus('finished');
-    setUserFinishTime(Date.now());
-    playFinishFanfare();
-    setRaceResults(results);
-  }, [playFinishFanfare]);
+  // Bot Racers Simulation
+  const { bots, resetBots } = useRaceBots({
+    isRacing: status === 'racing',
+    mode,
+    targetTextLength: raceData.text.length,
+  });
+
+  // Multiplayer Room Hook callbacks
+  const handleRemoteStart = useCallback((remotePayload?: { text: string; source?: string; mode: RaceMode }) => {
+    if (remotePayload?.text) {
+      setRaceData({ text: remotePayload.text, source: remotePayload.source });
+      if (remotePayload.mode) setMode(remotePayload.mode);
+      resetBots();
+      setRaceResults(null);
+      setUserFinishTime(undefined);
+    }
+    setIsRoomModalOpen(false);
+    setStatus('countdown');
+  }, [resetBots]);
+
+  const handleHostSettingsSync = useCallback((settings: { includeBots: boolean; mode?: RaceMode }) => {
+    if (settings.mode) {
+      setMode(settings.mode);
+      setRaceData(generateRaceText(settings.mode));
+    }
+  }, []);
+
+  // Finish handler ref so useTypingEngine can be called before useRaceRoom
+  const onFinishRef = useRef<(results: RaceResults) => void>(() => {});
 
   // Typing Engine Hook
   const {
@@ -82,34 +105,14 @@ export default function App() {
   } = useTypingEngine({
     targetText: raceData.text,
     mode,
-    onFinish: handleRaceFinish,
+    onFinish: (results) => onFinishRef.current(results),
     onKeypressSound: playKeySound,
     isLocked: status === 'countdown' || status === 'finished'
   });
 
-  // Bot Racers Simulation
-  const { bots, resetBots } = useRaceBots({
-    isRacing: status === 'racing',
-    mode,
-    targetTextLength: raceData.text.length,
-  });
-
-  // Multiplayer Room Hook
-  const handleRemoteStart = useCallback((remotePayload?: { text: string; source?: string; mode: RaceMode }) => {
-    if (remotePayload?.text) {
-      setRaceData({ text: remotePayload.text, source: remotePayload.source });
-      if (remotePayload.mode) setMode(remotePayload.mode);
-      resetEngine();
-      resetBots();
-      setRaceResults(null);
-      setUserFinishTime(undefined);
-    }
-    setIsRoomModalOpen(false);
-    setStatus('countdown');
-  }, [resetEngine, resetBots]);
-
   const {
     roomId,
+    userId,
     userName,
     setUserName,
     userAvatar,
@@ -127,7 +130,48 @@ export default function App() {
     lobbyCountdown,
     startLobbyCountdown,
     forceLaunchNow,
-  } = useRaceRoom(userProgress, netWpm, status === 'finished', handleRemoteStart, playLobbyTick);
+    isHost,
+    includeBots,
+    toggleIncludeBots,
+    isAfk,
+    toasts,
+    dismissToast,
+    sendQuickChat,
+    chatBubbles,
+    seriesScores,
+    recordWinner,
+    requestRematch,
+    getInviteLink,
+  } = useRaceRoom(
+    userProgress,
+    netWpm,
+    status === 'finished',
+    mode,
+    handleRemoteStart,
+    playLobbyTick,
+    handleHostSettingsSync
+  );
+
+  // Handle Race finish & winner determination
+  const handleRaceFinish = useCallback((results: RaceResults) => {
+    setStatus('finished');
+    const finishTime = Date.now();
+    setUserFinishTime(finishTime);
+    playFinishFanfare();
+    setRaceResults(results);
+
+    // If multiplayer, check if this pilot is the first finisher across the line
+    if (roomId) {
+      const anyOtherFinished = remoteRacers.some(r => r.finishTime && r.finishTime < finishTime);
+      if (!anyOtherFinished) {
+        recordWinner(userName);
+      }
+    }
+  }, [playFinishFanfare, roomId, remoteRacers, userName, recordWinner]);
+
+  useEffect(() => {
+    onFinishRef.current = handleRaceFinish;
+  }, [handleRaceFinish]);
 
   // User racer object
   const userRacer: Racer = useMemo(() => ({
@@ -139,15 +183,20 @@ export default function App() {
     progress: userProgress,
     currentWpm: netWpm,
     finishTime: userFinishTime,
-  }), [userName, userAvatar, userProgress, netWpm, userFinishTime]);
+    isHost,
+    isAfk,
+    chatBubble: chatBubbles[userId],
+  }), [userName, userAvatar, userProgress, netWpm, userFinishTime, isHost, isAfk, chatBubbles, userId]);
 
-  // Combined racers on the track (Max 4 racers: User + Remote players + Bots to fill remaining lanes)
+  // Combined racers on the track:
+  // If includeBots is false, pure human-only racing (User + Remote players).
+  // If includeBots is true, pad up to 4 racers with simulated bots.
   const allRacers: Racer[] = useMemo(() => {
     const racers: Racer[] = [userRacer, ...remoteRacers];
-    const botsNeeded = Math.max(0, 4 - racers.length);
+    const botsNeeded = includeBots ? Math.max(0, 4 - racers.length) : 0;
     const selectedBots = bots.slice(0, botsNeeded);
     return [...racers, ...selectedBots];
-  }, [userRacer, remoteRacers, bots]);
+  }, [userRacer, remoteRacers, bots, includeBots]);
 
   // Automatic 10-second F1 countdown trigger when all pilots click READY
   useEffect(() => {
@@ -168,6 +217,12 @@ export default function App() {
     setUserFinishTime(undefined);
     setStatus('idle');
   }, [mode, resetEngine, resetBots]);
+
+  // Instant rematch trigger in multiplayer
+  const handleRematch = useCallback(() => {
+    requestRematch();
+    startNewRace();
+  }, [requestRematch, startNewRace]);
 
   // Manual Trigger from Solo Mode
   const triggerSoloStart = useCallback(() => {
@@ -212,7 +267,12 @@ export default function App() {
         {/* Header HUD & Controls */}
         <RaceHeader
           mode={mode}
-          onSelectMode={(m) => startNewRace(m)}
+          onSelectMode={(m) => {
+            startNewRace(m);
+            if (roomId && isHost) {
+              toggleIncludeBots(includeBots);
+            }
+          }}
           status={status}
           timeRemaining={timeRemaining}
           elapsedTime={elapsedTime}
@@ -227,6 +287,8 @@ export default function App() {
           roomId={roomId}
           onOpenRoomModal={() => setIsRoomModalOpen(true)}
           onRestart={() => startNewRace()}
+          isHost={isHost}
+          seriesScores={seriesScores}
         />
 
         {/* F1 Grid Launch 10-Second Countdown Banner (When all players ready) */}
@@ -297,6 +359,10 @@ export default function App() {
           allRacers={allRacers}
           onPlayAgain={() => startNewRace()}
           onNextTrack={() => startNewRace()}
+          seriesScores={seriesScores}
+          onRematch={roomId ? handleRematch : undefined}
+          onSendQuickChat={roomId ? sendQuickChat : undefined}
+          isMultiplayer={!!roomId}
         />
       )}
 
@@ -328,7 +394,15 @@ export default function App() {
         remotePilots={remotePilots}
         allReady={allReady}
         lobbyCountdown={lobbyCountdown}
+        isHost={isHost}
+        includeBots={includeBots}
+        onToggleIncludeBots={toggleIncludeBots}
+        onSendQuickChat={sendQuickChat}
+        getInviteLink={getInviteLink}
       />
+
+      {/* Real-time Cyber Toast Alerts */}
+      <CyberToast toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }
